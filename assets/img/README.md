@@ -14,3 +14,8 @@ placeholder on the site, so you can add them one at a time.
 
 Keep them under ~300 KB each (export at quality 75–80). Slightly desaturated /
 warm grades match the palette better than glossy.
+
+## furnish.html
+Uses staging.jpg (band) and pallets.jpg (quote section) — same files as above.
+Pricing on furnish.html is "quoted in 24 hrs" on purpose; when you settle a
+per-room number, replace the Price row in the hero card and the "Three ways to buy" cards.
