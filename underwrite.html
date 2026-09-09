@@ -93,10 +93,13 @@
         </div>
         <p class="lede" style="font-size:1rem">
           Saved in this browser only — nothing is uploaded anywhere. Clearing your browser
-          data clears the pipeline, so export the CSV if it matters.
+          data clears the pipeline, so export the CSV if it matters. Tick two or more in the
+          Cmp column to stand them next to each other.
         </p>
       </div>
       <div data-pipeline></div>
+
+      <section class="cmp__panel" aria-label="Deal comparison" data-compare></section>
     </section>
 
     <details class="assume">
@@ -111,6 +114,7 @@
         <li><b>Vacancy, maintenance, CapEx, and management</b> are taken as percentages of gross scheduled income, which is the conservative way to do it.</li>
         <li><b>Flip carrying costs</b> run for the full holding period, including the months the house sits on the market after the work is done.</li>
         <li><b>Furnishing</b> on the short-term sheet is entered at retail, then multiplied by our wholesale cost basis — that gap is the Hughes Living advantage, shown as its own line.</li>
+        <li><b>Comparisons</b> recalculate each saved deal from its stored inputs rather than replaying the figures as they stood on the day it was saved, so a side-by-side always uses the formulas above. Only rows whose better direction is unambiguous are marked, and no row is marked when a deal leaves it blank.</li>
         <li>Everything here is an estimate. Verify taxes with the county, insurance with a carrier, rent with real comps, and rehab with a contractor who has walked the property.</li>
       </ul>
     </details>

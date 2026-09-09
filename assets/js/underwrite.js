@@ -456,6 +456,30 @@
     idle:  'Enter a deal'
   };
 
+  /* Which way is better, per result row, judged on the figure as printed.
+     Only rows whose direction is unambiguous appear here — leverage, offer
+     gaps and headline sizes are deliberately left out, because more is not
+     plainly better. A row in neither map is never flagged.
+
+     Note the expense rows in BETTER_HIGH: they print with a leading minus, so
+     the strongest column is the greatest — the least negative — one. Sorting
+     them the other way would crown the biggest expense. */
+  var BETTER_HIGH = {
+    'Net profit': 1, 'Equity created': 1, 'Annualized': 1, 'Return on cash': 1,
+    'Cash-on-cash': 1, 'Cash flow / month': 1, 'Cash flow / year': 1,
+    'Cap rate on basis': 1, 'DSCR': 1, 'Rent-to-price': 1,
+    'Net operating income': 1, 'Effective gross income': 1,
+    'Gross scheduled income': 1, 'Gross revenue': 1,
+    'Value at market cap': 1, 'Saved vs. retail': 1,
+    /* printed as negatives */
+    'Vacancy loss': 1, 'Operating expenses': 1, 'Other operating expenses': 1,
+    'Annual debt service': 1, 'Platform fees': 1, 'Cleaning cost': 1
+  };
+  var BETTER_LOW = {
+    'Cash out of pocket': 1, 'Total project cost': 1, 'Expense ratio': 1,
+    'Selling costs': 1, 'Interest + points': 1, 'Monthly P&I': 1
+  };
+
   /* ---------- state ---------- */
 
   var STORE_KEY = 'hlc-pipeline-v1';
@@ -463,11 +487,18 @@
   var values = {};   // values[strategyKey] = { fieldId: number }
   var names = {};    // names[strategyKey] = string
 
+  var FIELD_INDEX = {};   // FIELD_INDEX[strategyKey][fieldId] = field definition
+  var compareIds = [];    // saved-deal ids picked for the comparison, in pick order
+
   ORDER.forEach(function (key) {
     values[key] = {};
     names[key] = '';
+    FIELD_INDEX[key] = {};
     STRATEGIES[key].groups.forEach(function (g) {
-      g.fields.forEach(function (fd) { values[key][fd.id] = fd.def; });
+      g.fields.forEach(function (fd) {
+        values[key][fd.id] = fd.def;
+        FIELD_INDEX[key][fd.id] = fd;
+      });
     });
   });
 
@@ -482,6 +513,8 @@
   var elTitle = document.querySelector('[data-result-title]');
   var elTag = document.querySelector('[data-result-tag]');
   var elPipeline = document.querySelector('[data-pipeline]');
+  var elCompare = document.querySelector('[data-compare]');
+  var cmpBtn = null;   // rebuilt with the pipeline table, kept in sync on every tick
   var btnSave = document.querySelector('[data-save]');
   var btnReset = document.querySelector('[data-reset]');
   var form = document.querySelector('[data-form]');
@@ -623,11 +656,28 @@
 
   /* ---------- pipeline ---------- */
 
+  var uidSeq = 0;
+  function uid() {
+    uidSeq += 1;
+    return 'd' + Date.now().toString(36) + uidSeq.toString(36);
+  }
+
   function loadPipeline() {
+    var list;
     try {
       var raw = localStorage.getItem(STORE_KEY);
-      return raw ? JSON.parse(raw) : [];
+      list = raw ? JSON.parse(raw) : [];
     } catch (err) { return []; }
+    if (!Array.isArray(list)) return [];
+
+    /* Deals saved before the comparison existed have no id. Stamp one so
+       selection and removal survive the list being reordered. */
+    var patched = false;
+    list.forEach(function (d) {
+      if (d && !d.id) { d.id = uid(); patched = true; }
+    });
+    if (patched) savePipeline(list);
+    return list;
   }
 
   function savePipeline(list) {
@@ -639,16 +689,23 @@
     var list = loadPipeline();
     elPipeline.innerHTML = '';
 
+    /* Drop selections whose deal has since been removed or aged off the list. */
+    var alive = {};
+    list.forEach(function (d) { alive[d.id] = 1; });
+    compareIds = compareIds.filter(function (id) { return alive[id]; });
+
     if (!list.length) {
       elPipeline.appendChild(el('p', {
         cls: 'pipeline__empty',
         text: 'No deals saved yet. Run a property above and press “Save to pipeline”.'
       }));
+      renderCompare(false);
       return;
     }
 
     var thead = el('thead', {}, [
       el('tr', {}, [
+        el('th', { scope: 'col', cls: 'pick', text: 'Cmp' }),
         el('th', { scope: 'col', text: 'Deal' }),
         el('th', { scope: 'col', text: 'Strategy' }),
         el('th', { scope: 'col', text: 'Headline' }),
@@ -659,7 +716,22 @@
     ]);
 
     var tbody = el('tbody');
-    list.forEach(function (d, i) {
+    list.forEach(function (d) {
+      var pick = el('input', {
+        type: 'checkbox',
+        'aria-label': 'Compare ' + (d.name || 'unnamed deal')
+      });
+      pick.checked = compareIds.indexOf(d.id) !== -1;
+      pick.addEventListener('change', function () {
+        var at = compareIds.indexOf(d.id);
+        if (pick.checked && at === -1) compareIds.push(d.id);
+        else if (!pick.checked && at !== -1) compareIds.splice(at, 1);
+        /* Redrawing the whole table here would drop the checkbox the user is
+           standing on, so only the button and the panel are refreshed. */
+        syncCompareButton();
+        renderCompare(false);
+      });
+
       var loadBtn = el('button', { type: 'button', text: 'Load' });
       loadBtn.addEventListener('click', function () {
         current = d.strategy;
@@ -671,13 +743,12 @@
 
       var delBtn = el('button', { type: 'button', text: 'Remove' });
       delBtn.addEventListener('click', function () {
-        var next = loadPipeline();
-        next.splice(i, 1);
-        savePipeline(next);
+        savePipeline(loadPipeline().filter(function (x) { return x.id !== d.id; }));
         renderPipeline();
       });
 
       tbody.appendChild(el('tr', {}, [
+        el('td', { cls: 'pick' }, [pick]),
         el('th', { scope: 'row', text: d.name || '(unnamed)' }),
         el('td', { text: STRATEGIES[d.strategy] ? STRATEGIES[d.strategy].title : d.strategy }),
         el('td', { cls: 'n', text: d.metricLabel + ' ' + d.metricValue }),
@@ -686,6 +757,10 @@
         el('td', { cls: 'act' }, [loadBtn, delBtn])
       ]));
     });
+
+    cmpBtn = el('button', { cls: 'btn', type: 'button' });
+    cmpBtn.addEventListener('click', function () { renderCompare(true); });
+    syncCompareButton();
 
     var exportBtn = el('button', { cls: 'btn btn--ghost', type: 'button', text: 'Export CSV' });
     exportBtn.addEventListener('click', function () { exportCsv(list); });
@@ -699,16 +774,285 @@
     });
 
     elPipeline.appendChild(el('div', { cls: 'tablewrap' }, [el('table', { cls: 'data' }, [thead, tbody])]));
-    elPipeline.appendChild(el('div', { cls: 'uw__actions', style: 'border:1px solid var(--line);border-top:0' }, [exportBtn, clearBtn]));
+    elPipeline.appendChild(el('div', { cls: 'uw__actions', style: 'border:1px solid var(--line);border-top:0' }, [cmpBtn, exportBtn, clearBtn]));
+
+    renderCompare(false);
+  }
+
+  /* ---------- comparison ---------- */
+
+  function syncCompareButton() {
+    if (!cmpBtn) return;
+    var n = compareIds.length;
+    cmpBtn.textContent = n > 1 ? 'Compare ' + n + ' deals' : 'Compare deals';
+    cmpBtn.disabled = n < 2;
+    cmpBtn.title = n < 2 ? 'Tick two or more deals in the Cmp column' : '';
+  }
+
+
+  /* Pull a number back out of a formatted figure so one row can be ranked
+     across columns. Every deal in a row went through the same formatter, so
+     the parsed values are comparable. Em dashes and infinities fall out as NaN. */
+  function parseFigure(str) {
+    var s = String(str).replace(/\u2212/g, '-').replace(/[^0-9.\-]/g, '');
+    if (!s || s === '-' || s === '.') return NaN;
+    var n = parseFloat(s);
+    return isFinite(n) ? n : NaN;
+  }
+
+  /* Index of the strongest column in a row, or -1 when the row should not be
+     ranked at all: unknown direction, a gap in any column, or a flat tie. */
+  function bestColumn(label, cells) {
+    var dir = BETTER_HIGH[label] ? 1 : (BETTER_LOW[label] ? -1 : 0);
+    if (!dir) return -1;
+
+    var nums = [];
+    for (var i = 0; i < cells.length; i++) {
+      var n = parseFigure(cells[i]);
+      if (!isFinite(n)) return -1;
+      nums.push(n);
+    }
+
+    var best = 0;
+    var tied = true;
+    for (var j = 1; j < nums.length; j++) {
+      if (nums[j] !== nums[0]) tied = false;
+      if (dir === 1 ? nums[j] > nums[best] : nums[j] < nums[best]) best = j;
+    }
+    return tied ? -1 : best;
+  }
+
+  function fieldLabel(strategyKey, fieldId) {
+    var fd = FIELD_INDEX[strategyKey] && FIELD_INDEX[strategyKey][fieldId];
+    return fd ? fd.label : fieldId;
+  }
+
+  function fieldCell(strategyKey, fieldId, val) {
+    if (typeof val !== 'number' || !isFinite(val)) return '\u2014';
+    var fd = FIELD_INDEX[strategyKey] && FIELD_INDEX[strategyKey][fieldId];
+    if (!fd) return whole(val);
+    if (fd.unit === 'usd') return money(val);
+    if (fd.unit === 'pct') return val + '%';
+    return whole(val);
+  }
+
+  /* Recompute every picked deal from its stored inputs, then line the rows up.
+     Recomputing rather than replaying the saved headline means a comparison
+     always reflects the current formulas, not the ones in force on the day the
+     deal was saved. */
+  function compareModel() {
+    var byId = {};
+    loadPipeline().forEach(function (d) { byId[d.id] = d; });
+
+    var deals = [];
+    compareIds.forEach(function (id) {
+      var d = byId[id];
+      if (d && STRATEGIES[d.strategy]) deals.push(d);
+    });
+    if (deals.length < 2) return null;
+
+    var outs = deals.map(function (d) { return STRATEGIES[d.strategy].compute(d.values); });
+
+    /* Union of result rows in first-appearance order. A strategy that does not
+       produce a row leaves an em dash in its column. */
+    var order = [];
+    var seen = {};
+    outs.forEach(function (out) {
+      out.rows.forEach(function (r) {
+        if (!seen[r.k]) { seen[r.k] = 1; order.push(r.k); }
+      });
+    });
+
+    var resultRows = order.map(function (label) {
+      var cells = outs.map(function (out) {
+        var hit = '\u2014';
+        out.rows.forEach(function (r) { if (r.k === label) hit = r.v; });
+        return hit;
+      });
+      return { label: label, cells: cells, best: bestColumn(label, cells) };
+    });
+
+    /* Same treatment for the inputs behind each deal. */
+    var inputOrder = [];
+    var inputOwner = {};
+    deals.forEach(function (d) {
+      Object.keys(d.values).forEach(function (id) {
+        if (!inputOwner[id]) { inputOwner[id] = d.strategy; inputOrder.push(id); }
+      });
+    });
+
+    var inputRows = inputOrder.map(function (id) {
+      return {
+        label: fieldLabel(inputOwner[id], id),
+        cells: deals.map(function (d) {
+          return Object.prototype.hasOwnProperty.call(d.values, id)
+            ? fieldCell(d.strategy, id, d.values[id])
+            : '\u2014';
+        })
+      };
+    });
+
+    var mixed = deals.some(function (d) { return d.strategy !== deals[0].strategy; });
+
+    return {
+      deals: deals, outs: outs,
+      resultRows: resultRows, inputRows: inputRows,
+      mixed: mixed
+    };
+  }
+
+  function groupRow(span, label) {
+    return el('tr', { cls: 'cmp__group' }, [
+      el('th', { scope: 'colgroup', colspan: String(span), text: label })
+    ]);
+  }
+
+  function figureCell(text, isBest) {
+    var td = el('td', { cls: 'n' + (isBest ? ' is-best' : '') });
+    td.appendChild(document.createTextNode(text));
+    if (isBest) td.appendChild(el('span', { cls: 'cmp__flag', text: 'best' }));
+    return td;
+  }
+
+  function renderCompare(scrollTo) {
+    if (!elCompare) return;
+    elCompare.innerHTML = '';
+
+    var m = compareModel();
+    if (!m) return;
+
+    var span = m.deals.length + 1;
+
+    var dropBtn = el('button', { cls: 'btn btn--ghost', type: 'button', text: 'Clear selection' });
+    dropBtn.addEventListener('click', function () {
+      compareIds = [];
+      renderPipeline();
+    });
+
+    elCompare.appendChild(el('div', { cls: 'cmp__head' }, [
+      el('div', {}, [
+        el('p', { cls: 'label', text: 'Side by side' }),
+        el('h3', { text: m.deals.length + ' deals compared' })
+      ]),
+      dropBtn
+    ]));
+
+    if (m.mixed) {
+      elCompare.appendChild(el('p', {
+        cls: 'cmp__note',
+        text: 'These deals were run on different sheets. A row one strategy does not produce shows an em dash, and no row with a gap in it is ranked.'
+      }));
+    }
+
+    var headCells = [
+      el('th', { scope: 'col', cls: 'cmp__corner' }, [el('span', { cls: 'u-vh', text: 'Figure' })])
+    ];
+    m.deals.forEach(function (d) {
+      headCells.push(el('th', { scope: 'col', text: d.name || '(unnamed)' }));
+    });
+
+    var tbody = el('tbody');
+
+    tbody.appendChild(groupRow(span, 'Deal'));
+
+    tbody.appendChild(el('tr', {}, [el('th', { scope: 'row', text: 'Strategy' })].concat(
+      m.deals.map(function (d) { return el('td', { text: STRATEGIES[d.strategy].title }); })
+    )));
+
+    tbody.appendChild(el('tr', {}, [el('th', { scope: 'row', text: 'Verdict' })].concat(
+      m.outs.map(function (out) {
+        return el('td', {
+          cls: 'cmp__verdict is-' + out.state,
+          text: VERDICT_WORDS[out.state] || out.state
+        });
+      })
+    )));
+
+    tbody.appendChild(el('tr', {}, [el('th', { scope: 'row', text: 'Saved' })].concat(
+      m.deals.map(function (d) { return el('td', { cls: 'n', text: d.date || '\u2014' }); })
+    )));
+
+    tbody.appendChild(groupRow(span, 'Results'));
+    m.resultRows.forEach(function (r) {
+      tbody.appendChild(el('tr', {}, [el('th', { scope: 'row', text: r.label })].concat(
+        r.cells.map(function (c, i) { return figureCell(c, i === r.best); })
+      )));
+    });
+
+    tbody.appendChild(groupRow(span, 'Inputs'));
+    m.inputRows.forEach(function (r) {
+      tbody.appendChild(el('tr', {}, [el('th', { scope: 'row', text: r.label })].concat(
+        r.cells.map(function (c) { return el('td', { cls: 'n', text: c }); })
+      )));
+    });
+
+    elCompare.appendChild(el('div', { cls: 'tablewrap' }, [
+      el('table', { cls: 'data cmp' }, [el('thead', {}, [el('tr', {}, headCells)]), tbody])
+    ]));
+
+    var csvBtn = el('button', { cls: 'btn btn--ghost', type: 'button', text: 'Export comparison' });
+    csvBtn.addEventListener('click', function () { exportCompareCsv(m); });
+
+    elCompare.appendChild(el('div', {
+      cls: 'uw__actions',
+      style: 'border:1px solid var(--line);border-top:0'
+    }, [csvBtn]));
+
+    elCompare.appendChild(el('p', {
+      cls: 'cmp__note',
+      text: 'Best marks the strongest single figure in a row, not the better deal \u2014 read the verdict row for that. Rows where more is not plainly better, like loan amount, are never marked.'
+    }));
+
+    if (scrollTo) elCompare.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* ---------- csv ---------- */
+
+  function csvCell(v) {
+    return '"' + String(v).replace(/"/g, '""') + '"';
+  }
+
+  function csvRow(cells) {
+    return cells.map(csvCell).join(',');
+  }
+
+  function downloadCsv(text, filename) {
+    var blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function exportCompareCsv(m) {
+    var lines = [
+      csvRow(['Figure'].concat(m.deals.map(function (d) { return d.name || '(unnamed)'; }))),
+      csvRow(['Strategy'].concat(m.deals.map(function (d) { return STRATEGIES[d.strategy].title; }))),
+      csvRow(['Verdict'].concat(m.outs.map(function (o) { return VERDICT_WORDS[o.state] || o.state; }))),
+      csvRow(['Saved'].concat(m.deals.map(function (d) { return d.date || ''; }))),
+      '',
+      csvRow(['Results'])
+    ];
+    m.resultRows.forEach(function (r) { lines.push(csvRow([r.label].concat(r.cells))); });
+    lines.push('');
+    lines.push(csvRow(['Inputs']));
+    m.inputRows.forEach(function (r) { lines.push(csvRow([r.label].concat(r.cells))); });
+
+    downloadCsv(lines.join('\r\n'), 'hlc-comparison.csv');
   }
 
   function exportCsv(list) {
-    var header = ['Deal', 'Strategy', 'Headline metric', 'Value', 'Verdict', 'Saved', 'Inputs'];
-    var lines = [header.join(',')];
+    var lines = [
+      csvRow(['Deal', 'Strategy', 'Headline metric', 'Value', 'Verdict', 'Saved', 'Inputs'])
+    ];
 
     list.forEach(function (d) {
       var inputs = Object.keys(d.values).map(function (k) { return k + '=' + d.values[k]; }).join(' | ');
-      var cells = [
+      lines.push(csvRow([
         d.name || '(unnamed)',
         STRATEGIES[d.strategy] ? STRATEGIES[d.strategy].title : d.strategy,
         d.metricLabel,
@@ -716,21 +1060,10 @@
         VERDICT_WORDS[d.state] || d.state,
         d.date,
         inputs
-      ];
-      lines.push(cells.map(function (c) {
-        return '"' + String(c).replace(/"/g, '""') + '"';
-      }).join(','));
+      ]));
     });
 
-    var blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'hlc-pipeline.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    downloadCsv(lines.join('\r\n'), 'hlc-pipeline.csv');
   }
 
   /* ---------- actions ---------- */
