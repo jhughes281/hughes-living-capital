@@ -191,6 +191,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .engine__list{ display:grid; gap:0; }
 .engine__item{ display:grid; grid-template-columns:auto 1fr; gap:1.1rem; padding:1.15rem 0; border-top:1px solid #2c343c; }
 .engine__item:last-child{ border-bottom:1px solid #2c343c; }
+@media (min-width:900px){ .engine__list--wide{ grid-template-columns:1fr 1fr; column-gap:3rem; } .engine__list--wide .engine__item:nth-last-child(2){ border-bottom:1px solid #2c343c; } }
 .engine__step{ font-family:var(--ff-mono); font-size:.75rem; color:var(--brick); padding-top:.28rem; font-weight:500; }
 .engine__item h3{ font-size:1.0625rem; font-family:var(--ff-body); font-weight:600; letter-spacing:0; margin-bottom:.3rem; }
 .engine__item p{ margin:0; font-size:.9375rem; color:#b6bfc6; max-width:52ch; }
