@@ -228,6 +228,142 @@
       }
     },
 
+    coliving: {
+      tab: 'Co-living',
+      title: 'Co-living, rent by the room',
+      tag: 'PadSplit',
+      groups: [
+        { legend: 'Acquisition', fields: [
+          f('purchase', 'Purchase price', 'usd', 165000),
+          f('conversion', 'Conversion cost', 'usd', 24000, 'Framing, doors, locks, egress'),
+          f('closePct', 'Closing costs', 'pct', 3, '% of purchase price')
+        ]},
+        { legend: 'The rooms', cols3: true, fields: [
+          f('rooms', 'Rooms after conversion', 'num', 6),
+          f('weeklyRent', 'Rent per room', 'usd', 165, 'Per week, utilities included'),
+          f('occPct', 'Room occupancy', 'pct', 88, 'Across the full year'),
+          f('tenancyMonths', 'Average tenancy', 'num', 7, 'Months a member stays')
+        ]},
+        { legend: 'Furnishing \u2014 the Hughes Living line', fields: [
+          f('furnRetailRoom', 'Furnishing at retail', 'usd', 1000, 'Per room. PadSplit budgets $1,000'),
+          f('costBasisPct', 'Our cost basis', 'pct', 45, '% of retail, from the warehouse')
+        ]},
+        { legend: 'Platform', fields: [
+          f('platformPct', 'Ongoing fee', 'pct', 8, '% of rent collected'),
+          f('placementDays', 'Placement fee', 'num', 10, 'Days of rent kept per new member')
+        ]},
+        { legend: 'Financing', fields: [
+          f('downPct', 'Down payment', 'pct', 25, '% of purchase price'),
+          f('ratePct', 'Interest rate', 'pct', 7.5),
+          f('termYears', 'Loan term', 'num', 30, 'Years')
+        ]},
+        { legend: 'Fixed expenses', fields: [
+          f('taxes', 'Property taxes', 'usd', 3600, 'Per year'),
+          f('insurance', 'Insurance', 'usd', 2400, 'Per year'),
+          f('utilitiesMonthly', 'Utilities + internet', 'usd', 520, 'Per month, and uncapped'),
+          f('hoaMonthly', 'HOA', 'usd', 0, 'Per month')
+        ]},
+        { legend: 'Reserves \u2014 % of rent collected', cols3: true, fields: [
+          f('maintPct', 'Maintenance', 'pct', 10, 'Six tenants, one kitchen'),
+          f('capexPct', 'CapEx', 'pct', 8),
+          f('mgmtPct', 'Local management', 'pct', 0, 'Use 5 if someone walks the house')
+        ]}
+      ],
+      compute: function (v) {
+        var furnCostRoom = v.furnRetailRoom * v.costBasisPct / 100;
+        var furnCost = furnCostRoom * v.rooms;
+        var furnSaved = (v.furnRetailRoom - furnCostRoom) * v.rooms;
+
+        var loan = v.purchase * (1 - v.downPct / 100);
+        var downAmt = v.purchase - loan;
+        var closing = v.purchase * v.closePct / 100;
+        var cashIn = downAmt + v.conversion + closing + furnCost;
+
+        var gsi = v.rooms * v.weeklyRent * 52;
+        var vacancy = gsi * (1 - v.occPct / 100);
+        var collected = gsi - vacancy;
+
+        /* PadSplit keeps the first N days of each new member's rent, so the
+           bill scales with turnover, not just with rent. Only filled rooms
+           turn over, hence the occupancy factor. */
+        var turnsPerRoom = v.tenancyMonths > 0 ? 12 / v.tenancyMonths : 0;
+        var placements = turnsPerRoom * v.rooms * v.occPct / 100;
+        var placementFee = placements * v.weeklyRent * v.placementDays / 7;
+        var platformFee = collected * v.platformPct / 100;
+
+        var reserves = collected * (v.maintPct + v.capexPct + v.mgmtPct) / 100;
+        var opex = v.taxes + v.insurance + (v.utilitiesMonthly + v.hoaMonthly) * 12 + reserves;
+
+        var noi = collected - placementFee - platformFee - opex;
+        var pi = pmt(loan, v.ratePct, v.termYears);
+        var ds = pi * 12;
+        var cf = noi - ds;
+
+        var basis = v.purchase + v.conversion + furnCost;
+        var cap = basis > 0 ? noi / basis : NaN;
+        var coc = cashIn > 0 ? cf / cashIn : NaN;
+        var dscr = ds > 0 ? noi / ds : Infinity;
+        var perRoom = v.rooms > 0 ? collected / v.rooms / 12 : NaN;
+        var take = collected > 0 ? (placementFee + platformFee) / collected : NaN;
+
+        var rows = [
+          { k: 'Monthly P&I', v: money(pi) },
+          { k: 'Gross scheduled income', v: money(gsi) },
+          { k: 'Vacancy loss', v: '−' + money(vacancy) },
+          { k: 'Placement fees', v: '−' + money(placementFee) },
+          { k: 'Platform fees', v: '−' + money(platformFee) },
+          { k: 'Operating expenses', v: '−' + money(opex) },
+          { k: 'Net operating income', v: money(noi), major: true },
+          { k: 'Annual debt service', v: '−' + money(ds) },
+          { k: 'Cash flow / year', v: money(cf), cls: cf >= 0 ? 'pos' : 'neg', major: true },
+          { k: 'Cash flow / month', v: money(cf / 12), cls: cf >= 0 ? 'pos' : 'neg' },
+          { k: 'Rent / room / month', v: money(perRoom) },
+          { k: 'Furnishing at our cost', v: money(furnCost) },
+          { k: 'Saved vs. retail', v: '+' + money(furnSaved), cls: 'pos' },
+          { k: 'Cash out of pocket', v: money(cashIn), major: true },
+          { k: 'Cap rate on basis', v: pct(cap) },
+          { k: 'Cash-on-cash', v: pct(coc), cls: coc >= 0.14 ? 'pos' : '', major: true },
+          { k: 'DSCR', v: ratio(dscr) }
+        ];
+
+        var why = [];
+        var state;
+        if (v.purchase <= 0 || v.rooms <= 0 || v.weeklyRent <= 0) {
+          state = 'idle';
+        } else {
+          why.push(whole(v.rooms) + ' rooms at ' + money(v.weeklyRent) +
+            ' a week collect ' + money(collected) + ' a year at ' + pct(v.occPct / 100, 0) + ' full.');
+
+          why.push('Furnishing from the warehouse keeps ' + money(furnSaved) + ' in the deal.');
+
+          if (isFinite(take)) {
+            why.push('PadSplit takes ' + pct(take) + ' of what you collect, placement fees included.');
+          }
+
+          why.push(cf > 0
+            ? 'Positive cash flow of ' + money(cf / 12) + ' a month.'
+            : 'Negative cash flow of ' + money(-cf / 12) + ' a month.');
+
+          why.push(coc >= 0.14
+            ? 'Cash-on-cash of ' + pct(coc) + ' clears the 14% co-living floor.'
+            : 'Cash-on-cash of ' + pct(coc) + ' is under the 14% co-living floor.');
+
+          why.push('Deed restrictions and occupancy limits decide this one, not the arithmetic. Check the address before you close.');
+
+          if (cf > 0 && coc >= 0.14 && dscr >= 1.25) state = 'pass';
+          else if (cf > 0) state = 'watch';
+          else state = 'fail';
+        }
+
+        return {
+          rows: rows,
+          state: state,
+          why: why,
+          summary: { label: 'Cash-on-cash', value: pct(coc) }
+        };
+      }
+    },
+
     str: {
       tab: 'Short-term',
       title: 'Short-term rental',
@@ -447,7 +583,7 @@
     }
   };
 
-  var ORDER = ['flip', 'rental', 'str', 'comm'];
+  var ORDER = ['flip', 'rental', 'coliving', 'str', 'comm'];
 
   var VERDICT_WORDS = {
     pass:  'Clears the box',
@@ -473,7 +609,8 @@
     'Value at market cap': 1, 'Saved vs. retail': 1,
     /* printed as negatives */
     'Vacancy loss': 1, 'Operating expenses': 1, 'Other operating expenses': 1,
-    'Annual debt service': 1, 'Platform fees': 1, 'Cleaning cost': 1
+    'Annual debt service': 1, 'Platform fees': 1, 'Cleaning cost': 1,
+    'Placement fees': 1
   };
   var BETTER_LOW = {
     'Cash out of pocket': 1, 'Total project cost': 1, 'Expense ratio': 1,
