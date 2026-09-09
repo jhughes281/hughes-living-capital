@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Underwriting sheet — Hughes Living Capital</title>
+<meta name="description" content="Run a property through flip, rental, short-term rental, or commercial underwriting: MAO, cash-on-cash, cap rate, DSCR, and a verdict against the Hughes Living Capital buy box.">
+<meta name="theme-color" content="#14181c">
+<link rel="canonical" href="https://jhughes281.github.io/hughes-living-capital/underwrite.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/hlc.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2314181c'/%3E%3Cpath d='M6 18 16 9l10 9' fill='none' stroke='%239c3d20' stroke-width='2.4'/%3E%3Cpath d='M9 18v6h14v-6' fill='none' stroke='%23f3f0ea' stroke-width='2.2'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip" href="#sheet">Skip to the sheet</a>
+
+<header class="masthead">
+  <div class="wrap masthead__in">
+    <a class="mark" href="index.html" aria-label="Hughes Living Capital, home">
+      <svg class="mark__glyph" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M4 17 16 7l12 10" fill="none" stroke="currentColor" stroke-width="2.4"/>
+        <path d="M8 17v9h16v-9" fill="none" stroke="#14181c" stroke-width="2.2"/>
+      </svg>
+      <span class="mark__name">Hughes Living Capital<span>Real estate</span></span>
+    </a>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>Menu</button>
+
+    <nav class="nav" id="site-nav" aria-label="Primary" data-nav>
+      <a href="index.html#thesis">The thesis</a>
+      <a href="index.html#strategies">What we buy</a>
+      <a href="index.html#edge">The edge</a>
+      <a href="index.html#buybox">Buy box</a>
+      <a class="is-cta" href="index.html#contact">Send a deal</a>
+    </nav>
+  </div>
+</header>
+
+<main class="uw" id="sheet">
+  <div class="wrap">
+
+    <div class="uw__head">
+      <p class="label label--brick">Underwriting sheet</p>
+      <h1 style="font-size:var(--step-3)">Run the numbers before the emotion.</h1>
+      <p class="lede" style="margin-top:1rem">
+        Four ways to buy the same building. Change the strategy and the whole sheet
+        changes with it — every figure recalculates as you type, and the verdict is scored
+        against our published buy box.
+      </p>
+    </div>
+
+    <noscript>
+      <p class="pipeline__empty">This sheet needs JavaScript to calculate. The buy box it scores against is on the <a href="index.html#buybox">home page</a>.</p>
+    </noscript>
+
+    <div class="tabs" role="tablist" aria-label="Underwriting strategy" data-tabs></div>
+
+    <div class="uw__grid">
+      <form id="uw-form" autocomplete="off" data-form>
+        <div data-fields></div>
+      </form>
+
+      <aside class="results sheet" aria-label="Results">
+        <div class="sheet__head">
+          <h2 data-result-title>Results</h2>
+          <span class="num" data-result-tag>—</span>
+        </div>
+
+        <div class="verdict" data-verdict>
+          <div class="verdict__grade">
+            <span class="verdict__dot"></span>
+            <span class="verdict__word" data-verdict-word>Enter a deal</span>
+          </div>
+          <ul class="verdict__why" data-verdict-why></ul>
+        </div>
+
+        <div class="sheet__rows" data-rows aria-live="polite"></div>
+
+        <div class="uw__actions">
+          <button class="btn" type="button" data-save>Save to pipeline</button>
+          <button class="btn btn--ghost" type="button" data-reset>Reset</button>
+        </div>
+      </aside>
+    </div>
+
+    <section class="pipeline" aria-labelledby="pipeline-h">
+      <div class="sec__head" style="margin-bottom:1.25rem">
+        <div>
+          <p class="label">Pipeline</p>
+          <h2 id="pipeline-h" style="font-size:var(--step-2)">Deals you have run</h2>
+        </div>
+        <p class="lede" style="font-size:1rem">
+          Saved in this browser only — nothing is uploaded anywhere. Clearing your browser
+          data clears the pipeline, so export the CSV if it matters.
+        </p>
+      </div>
+      <div data-pipeline></div>
+    </section>
+
+    <details class="assume">
+      <summary>How each number is calculated</summary>
+      <ul>
+        <li><b>MAO (max allowable offer)</b> uses the 70% rule: 70% of after-repair value, minus the rehab budget. It is a screening number, not a valuation.</li>
+        <li><b>Mortgage payment</b> is standard amortization on principal, rate, and term. Taxes and insurance are handled separately as operating expenses, not escrowed into the payment.</li>
+        <li><b>NOI</b> is effective gross income minus operating expenses. Debt service is never an operating expense, so NOI does not change when financing changes.</li>
+        <li><b>Cap rate</b> is NOI divided by total basis (purchase plus rehab), not just the purchase price.</li>
+        <li><b>Cash-on-cash</b> is annual pre-tax cash flow divided by total cash out of pocket — down payment, rehab, closing costs, and furnishing.</li>
+        <li><b>DSCR</b> is NOI divided by annual debt service. Most commercial lenders want 1.20–1.30 or better.</li>
+        <li><b>Vacancy, maintenance, CapEx, and management</b> are taken as percentages of gross scheduled income, which is the conservative way to do it.</li>
+        <li><b>Flip carrying costs</b> run for the full holding period, including the months the house sits on the market after the work is done.</li>
+        <li><b>Furnishing</b> on the short-term sheet is entered at retail, then multiplied by our wholesale cost basis — that gap is the Hughes Living advantage, shown as its own line.</li>
+        <li>Everything here is an estimate. Verify taxes with the county, insurance with a carrier, rent with real comps, and rehab with a contractor who has walked the property.</li>
+      </ul>
+    </details>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <h4>Hughes Living Capital</h4>
+        <p style="max-width:38ch;margin:0">The real estate arm of the Hughes companies. Houston, Texas.</p>
+      </div>
+      <div>
+        <h4>On this site</h4>
+        <ul>
+          <li><a href="index.html#thesis">The thesis</a></li>
+          <li><a href="index.html#strategies">What we buy</a></li>
+          <li><a href="index.html#buybox">Buy box</a></li>
+          <li><a href="index.html#contact">Send a deal</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Sister companies</h4>
+        <ul>
+          <li><a href="https://hugheslivingco.com">Hughes Living Co.</a></li>
+          <li><a href="https://jhughes281.github.io/HSG-Lockers/">Zen Lockers</a></li>
+          <li><a href="https://jhughes281.github.io/jay-hughes-studio/">Jay Hughes Studio</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot__legal">
+      <p>
+        This calculator is an estimating tool, not advice. Nothing on this site is an offer
+        to sell or a solicitation to buy any security, and nothing here is investment, tax,
+        or legal advice. Verify every figure with your own lender, insurer, inspector, and
+        tax professional before you buy anything.
+      </p>
+      <p style="margin-top:.75rem">© 2026 Hughes Living Capital.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/nav.js"></script>
+<script src="assets/js/underwrite.js"></script>
+</body>
+</html>
