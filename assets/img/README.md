@@ -19,3 +19,12 @@ warm grades match the palette better than glossy.
 Uses staging.jpg (band) and pallets.jpg (quote section) — same files as above.
 Pricing on furnish.html is "quoted in 24 hrs" on purpose; when you settle a
 per-room number, replace the Price row in the hero card and the "Three ways to buy" cards.
+
+## House illustrations
+`house-farmhouse.jpg`, `house-contemporary.jpg`, `house-spanish.jpg`,
+`house-modern.jpg`, `house-cottage.jpg` — 600x450, shown as a strip at the top of
+the "What we buy" section.
+
+These are **renderings, not real properties**, and the caption under the strip says so
+outright. Swap any of them for a photograph of a house actually bought and you can
+delete that sentence — until then it stays.

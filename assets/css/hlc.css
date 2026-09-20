@@ -436,6 +436,12 @@ table.data.cmp td.cmp__verdict.is-fail{ color:var(--brick); }
 .photo--band figcaption{ padding:.9rem var(--pad); }
 .photos{ display:grid; gap:1.25rem; margin-top:1.25rem; }
 @media (min-width:760px){ .photos{ grid-template-columns:repeat(3,1fr); } }
+/* Five thumbnails read as a strip on a wide screen, two up on a tablet. */
+.photos--5{ grid-template-columns:repeat(2,1fr); gap:1rem; }
+@media (min-width:760px){ .photos--5{ grid-template-columns:repeat(3,1fr); } }
+@media (min-width:1080px){ .photos--5{ grid-template-columns:repeat(5,1fr); } }
+.photos--5 figcaption{ display:block; padding:.7rem .8rem; font-size:.8125rem; line-height:1.35; }
+.photos--5 figcaption .label{ display:block; margin-bottom:.15rem; font-size:.625rem; }
 .photos .photo img{ aspect-ratio:4 / 3; }
 .photo--portrait img{ aspect-ratio:4 / 5; }
 
